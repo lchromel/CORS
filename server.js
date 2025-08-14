@@ -10,6 +10,13 @@ if (!TARGET) {
   console.error('ERROR: env TARGET is required (e.g., https://n8n.example.com)');
   process.exit(1);
 }
+
+
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*'; // e.g. http://localhost:3000 or *
+const PORT = process.env.PORT || 8080;
+
+const app = express();
+
 app.post('/tasks/create', createProxyMiddleware({
   target: TARGET,
   changeOrigin: true,
@@ -33,11 +40,6 @@ app.post('/tasks/regenerate', createProxyMiddleware({
   changeOrigin: true,
   secure: true
 }));
-
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*'; // e.g. http://localhost:3000 or *
-const PORT = process.env.PORT || 8080;
-
-const app = express();
 
 app.disable('x-powered-by');
 app.use(helmet());
