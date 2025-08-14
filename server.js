@@ -57,13 +57,11 @@ app.get('/health', (_, res) => res.status(200).send('ok'));
 app.use(
   '/tasks',
   createProxyMiddleware({
-    target: `${BASE_URL}/webhook-test/${N8N_TEST_UUID}`,
+    target: `${BASE_URL}/webhook-test/${N8N_TEST_UUID}`, // без лишнего /tasks в конце
     changeOrigin: true,
     xfwd: true,
-    // Ничего не переписываем: /tasks/create останется /tasks/create
-    pathRewrite: (path) => path,
+    pathRewrite: (path) => path.replace(/^\/tasks/, ''), // убираем префикс /tasks перед отправкой в n8n
     onProxyReq(proxyReq, req, res) {
-      // Гарантируем JSON по умолчанию
       if (!proxyReq.getHeader('content-type')) {
         proxyReq.setHeader('content-type', 'application/json');
       }
@@ -76,6 +74,7 @@ app.use(
     },
   })
 );
+
 
 // Fallback 404
 app.use((req, res) => {
