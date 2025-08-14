@@ -5,9 +5,9 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 
-const BASE_URL = process.env.BASE_URL; // берём переменную из Railway // e.g. https://your-n8n-domain
+const BASE_URL = process.env.BASE_URL || process.env.TARGET; // accept BASE_URL or legacy TARGET
 if (!BASE_URL) {
-  console.error('ERROR: env BASE_URL is required (e.g., https://n8n.example.com)');
+  console.error('ERROR: env BASE_URL (or TARGET) is required (e.g., https://n8n.example.com)');
   process.exit(1);
 }
 
@@ -92,5 +92,5 @@ proxiedPaths.forEach(base => {
 // app.use('/', createProxyMiddleware({ target: TARGET, changeOrigin: true }));
 
 app.listen(PORT, () => {
-  console.log(`Proxy ready on http://localhost:${PORT} -> ${TARGET}`);
+  console.log(`Proxy ready on http://localhost:${PORT} -> ${BASE_URL}`);
 });
