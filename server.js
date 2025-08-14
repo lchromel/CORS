@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 
-const TARGET = process.env.TARGET; // e.g. https://your-n8n-domain
+const TARGET = process.env.BASE_URL; // e.g. https://your-n8n-domain
 if (!TARGET) {
   console.error('ERROR: env TARGET is required (e.g., https://n8n.example.com)');
   process.exit(1);
