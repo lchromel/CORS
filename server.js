@@ -1,96 +1,88 @@
+// server.js
+// Railway proxy → n8n Webhook (TEST)
+
 const express = require('express');
-const { createProxyMiddleware } = require('http-proxy-middleware');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
 const morgan = require('morgan');
-
-const BASE_URL = process.env.BASE_URL || process.env.TARGET; // accept BASE_URL or legacy TARGET
-if (!BASE_URL) {
-  console.error('ERROR: env BASE_URL (or TARGET) is required (e.g., https://n8n.example.com)');
-  process.exit(1);
-}
-
-
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*'; // e.g. http://localhost:3000 or *
-const PORT = process.env.PORT || 8080;
+const cors = require('cors');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
+app.set('trust proxy', true);
 
-app.post('/tasks/create', createProxyMiddleware({
-  target: BASE_URL,
-  changeOrigin: true,
-  secure: true
-}));
+const PORT = process.env.PORT || 8080;
 
-app.post('/tasks/status', createProxyMiddleware({
-  target: BASE_URL,
-  changeOrigin: true,
-  secure: true
-}));
+// 1) БАЗОВЫЙ ДОМЕН n8n (без /webhook-test/... и без /tasks)
+//    Можно переопределить через переменную среды BASE_URL на Railway
+const BASE_URL = process.env.BASE_URL || 'https://lchromel.app.n8n.cloud';
 
-app.post('/tasks/choose', createProxyMiddleware({
-  target: BASE_URL,
-  changeOrigin: true,
-  secure: true
-}));
+// 2) ТВОЙ UUID ИЗ ССЫЛКИ TEST WEBHOOK (фиксируем как просил)
+const N8N_TEST_UUID = process.env.N8N_TEST_UUID || '3b4afc7a-204c-463e-89d8-582b91efe4b3';
 
-app.post('/tasks/regenerate', createProxyMiddleware({
-  target: BASE_URL,
-  changeOrigin: true,
-  secure: true
-}));
+// 3) Разрешённые источники для CORS
+//    Совет: ALLOWED_ORIGIN = null,http://localhost:3000,https://твой-домен
+const ALLOWED = (process.env.ALLOWED_ORIGIN || '*')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
 
-app.disable('x-powered-by');
-app.use(helmet());
-app.use(compression());
-app.use(morgan('tiny'));
-
-// Basic CORS for local files and dev sites
 const corsOptions = {
-  origin: (origin, cb) => {
-    if (ALLOWED_ORIGIN === '*') return cb(null, true);
-    const allowed = ALLOWED_ORIGIN.split(',').map(s => s.trim());
-    // origin can be undefined for file://
-    if (!origin && allowed.includes('null')) return cb(null, true);
-    if (origin && allowed.includes(origin)) return cb(null, true);
-    return cb(new Error('CORS blocked for origin: ' + origin));
+  origin(origin, cb) {
+    // file:// даёт Origin === null → разрешаем, если явно указано "null" или стоит "*"
+    if (!origin) return cb(null, true);
+    if (ALLOWED.includes('*')) return cb(null, true);
+    if (ALLOWED.includes('null') && origin === 'null') return cb(null, true);
+    if (ALLOWED.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS blocked: ${origin}`));
   },
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','X-API-Key','Authorization','Accept'],
-  credentials: false,
-  maxAge: 600
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  maxAge: 86400,
 };
-app.use(cors(corsOptions));
 
-// Preflight
+app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-// Health check
-app.get('/health', (req, res) => res.json({ ok: true }));
+app.use(morgan('tiny'));
+app.use(express.json({ limit: '2mb' }));
 
-// Strict allowlist of proxied paths (keep it tight)
-const proxiedPaths = ['/webhook', '/webhook/'];
-proxiedPaths.forEach(base => {
-  app.use(base, createProxyMiddleware({
-    target: BASE_URL,
+// Health
+app.get('/', (_, res) => res.status(200).send('ok'));
+app.get('/health', (_, res) => res.status(200).send('ok'));
+
+// ──────────────────────────────────────────────────────────────
+// Прокси: /tasks/*  →  https://lchromel.app.n8n.cloud/webhook-test/<UUID>/tasks/*
+// ВАЖНО: pathRewrite оставляем как есть — n8n ждёт префикс /tasks/:action
+// ──────────────────────────────────────────────────────────────
+app.use(
+  '/tasks',
+  createProxyMiddleware({
+    target: `${BASE_URL}/webhook-test/${N8N_TEST_UUID}`,
     changeOrigin: true,
-    secure: true,
     xfwd: true,
-    ws: true,
-    preserveHeaderKeyCase: true,
-    onProxyReq: (proxyReq, req, res) => {
-      // Forward API keys if you use them
-      if (req.headers['x-api-key']) {
-        proxyReq.setHeader('X-API-Key', req.headers['x-api-key']);
+    // Ничего не переписываем: /tasks/create останется /tasks/create
+    pathRewrite: (path) => path,
+    onProxyReq(proxyReq, req, res) {
+      // Гарантируем JSON по умолчанию
+      if (!proxyReq.getHeader('content-type')) {
+        proxyReq.setHeader('content-type', 'application/json');
       }
-    }
-  }));
+    },
+    onError(err, req, res) {
+      console.error('Proxy error:', err?.message);
+      if (!res.headersSent) {
+        res.status(502).json({ ok: false, error: 'Proxy failed', detail: err?.message });
+      }
+    },
+  })
+);
+
+// Fallback 404
+app.use((req, res) => {
+  res.status(404).json({ ok: false, error: 'Not Found' });
 });
 
-// Optionally proxy everything (uncomment if needed)
-// app.use('/', createProxyMiddleware({ target: TARGET, changeOrigin: true }));
-
 app.listen(PORT, () => {
-  console.log(`Proxy ready on http://localhost:${PORT} -> ${BASE_URL}`);
+  console.log(`Proxy running on :${PORT}`);
+  console.log(`→ Forwarding /tasks/* to ${BASE_URL}/webhook-test/${N8N_TEST_UUID}/tasks/*`);
 });
