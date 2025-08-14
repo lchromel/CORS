@@ -5,9 +5,9 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 
-const TARGET = process.env.BASE_URL; // e.g. https://your-n8n-domain
-if (!TARGET) {
-  console.error('ERROR: env TARGET is required (e.g., https://n8n.example.com)');
+const BASE_URL = process.env.BASE_URL; // берём переменную из Railway // e.g. https://your-n8n-domain
+if (!BASE_URL) {
+  console.error('ERROR: env BASE_URL is required (e.g., https://n8n.example.com)');
   process.exit(1);
 }
 
@@ -18,25 +18,25 @@ const PORT = process.env.PORT || 8080;
 const app = express();
 
 app.post('/tasks/create', createProxyMiddleware({
-  target: TARGET,
+  target: BASE_URL,
   changeOrigin: true,
   secure: true
 }));
 
 app.post('/tasks/status', createProxyMiddleware({
-  target: TARGET,
+  target: BASE_URL,
   changeOrigin: true,
   secure: true
 }));
 
 app.post('/tasks/choose', createProxyMiddleware({
-  target: TARGET,
+  target: BASE_URL,
   changeOrigin: true,
   secure: true
 }));
 
 app.post('/tasks/regenerate', createProxyMiddleware({
-  target: TARGET,
+  target: BASE_URL,
   changeOrigin: true,
   secure: true
 }));
@@ -73,7 +73,7 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 const proxiedPaths = ['/webhook', '/webhook/'];
 proxiedPaths.forEach(base => {
   app.use(base, createProxyMiddleware({
-    target: TARGET,
+    target: BASE_URL,
     changeOrigin: true,
     secure: true,
     xfwd: true,
