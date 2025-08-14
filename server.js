@@ -10,6 +10,29 @@ if (!TARGET) {
   console.error('ERROR: env TARGET is required (e.g., https://n8n.example.com)');
   process.exit(1);
 }
+app.post('/tasks/create', createProxyMiddleware({
+  target: TARGET,
+  changeOrigin: true,
+  secure: true
+}));
+
+app.post('/tasks/status', createProxyMiddleware({
+  target: TARGET,
+  changeOrigin: true,
+  secure: true
+}));
+
+app.post('/tasks/choose', createProxyMiddleware({
+  target: TARGET,
+  changeOrigin: true,
+  secure: true
+}));
+
+app.post('/tasks/regenerate', createProxyMiddleware({
+  target: TARGET,
+  changeOrigin: true,
+  secure: true
+}));
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*'; // e.g. http://localhost:3000 or *
 const PORT = process.env.PORT || 8080;
