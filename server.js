@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Прямой URL на твою ноду Webhook (Test URL)
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://lchromel.app.n8n.cloud/webhook/task';
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://lchromel.app.n8n.cloud/webhook-test/task';
 
 // Разрешённые источники (включи null если открываешь HTML как file://)
 const ALLOWED = (process.env.ALLOWED_ORIGIN || 'null,http://localhost:3000,https://cors-production-1452.up.railway.app')
